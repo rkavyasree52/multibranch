@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    parameters { choice(name: 'Proj', choices: ['ProjectA', 'ProjectB', 'Projectc'], description: '') }
+	env.BRANCH_NAME == 'master'
+	stages {
+	  stage('Checkout') {
+	       checkout([
+	       branches: [[name: '*/master']]
+		    userRemoteConfigs: [[credentialsId: '******', git clone url: 'https://projectC']]
+			 ])
+			checkout([
+	       branches: [[name: '*/master']]
+		    userRemoteConfigs: [[credentialsId: '******', git clone url: 'https://projectB']]
+			 ])
+            stage('Build ProjectC and ProjectB') {
+            failFast true
+            parallel {
+                stage('Build ProjectC') {
+                    steps {
+					       
+                            build job: "/projectC/${env.BRANCH}", wait: true
+							stage("Maven Build with Docker image"){
+                            def mavenHome = tool name: "Maven-3.6.1",type: "maven"
+                            def mavenCMD = "${mavenHome}/bin/mvn"
+                            sh '${mavenCMD} clean install -DskipTests'
+                }
+							
+                    }
+                }
+                stage('Build ProjectB') {
+                    steps {
+                            build job: "/projectB/${env.BRANCH}", wait: true
+							stage("Maven Build with Docker image"){
+                            def mavenHome = tool name: "Maven-3.6.1",type: "maven"
+                            def mavenCMD = "${mavenHome}/bin/mvn"
+                            sh '${mavenCMD} clean install -DskipTests'
+                    }
+                }
+            }
+    }
+		steps 'test-downstream'{
+   triggers {
+     upstream(upstreamProjects: "projectC,projectB/master", threshold: hudson.model.Result.SUCCESS)
+    }
+	stage('Checkout') {
+	       checkout([
+	       branches: [[name: '*/master']]
+		    userRemoteConfigs: [[credentialsId: '******', git clone url: 'https://projectA']]
+			 ])
+    stage('Build ProjectC') {
+                    steps {
+					        
+                            build job: "/projectC/${env.BRANCH}", wait: true
+							sh 'cp /var/lib/jenkins/workspace/projectC-jar-dev/target/ /var/lib/jenkins/workspace/projectA-jar-dev/target/ 
+							stage("Maven Build with Docker image"){
+                            def mavenHome = tool name: "Maven-3.6.1",type: "maven"
+                            def mavenCMD = "${mavenHome}/bin/mvn"
+                            sh '${mavenCMD} clean install -DskipTests
+                            }
+                    }
+}
